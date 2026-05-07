@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Modal, ActivityIndicator,
-  RefreshControl, Alert, Platform, Image,
+  RefreshControl, Alert, Platform, Image, KeyboardAvoidingView,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
@@ -382,9 +382,9 @@ export default function Cambios() {
       </TouchableOpacity>
 
       <Modal visible={modal} transparent animationType="slide" onRequestClose={() => setModal(false)}>
-        <View style={s.modalBg}>
+        <KeyboardAvoidingView style={s.modalBg} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={s.modal}>
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }} keyboardShouldPersistTaps="handled">
               <View style={s.modalHead}>
                 <Text style={s.modalTitle}>Añadir a {tab === 'busco' ? 'Busco' : 'Repetidos'}</Text>
                 <TouchableOpacity onPress={() => setModal(false)}><Ionicons name="close" size={24} color="#94a3b8" /></TouchableOpacity>
@@ -439,10 +439,12 @@ export default function Cambios() {
                 </TouchableOpacity>
               </View>
 
+              {/* IA oculta temporalmente para demo
               <TouchableOpacity testID="ai-open" style={s.aiBtn} onPress={openAi}>
                 <Ionicons name="sparkles" size={18} color="#fff" />
                 <Text style={s.aiBtnTxt}>🤖 Importar con IA desde foto</Text>
               </TouchableOpacity>
+              */}
 
               {mode === 'numeros' ? (
                 <>
@@ -555,10 +557,11 @@ export default function Cambios() {
               </View>
             </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
-      {/* MODAL IA */}
+      {/* MODAL IA — oculto temporalmente para demo (la lógica/handlers permanecen sin tocar) */}
+      {false ? (
       <Modal visible={aiModal} transparent animationType="slide" onRequestClose={() => setAiModal(false)}>
         <View style={s.modalBg}>
           <View style={s.modal}>
@@ -676,6 +679,7 @@ export default function Cambios() {
           </View>
         </View>
       </Modal>
+      ) : null}
     </View>
   );
 }
@@ -696,7 +700,7 @@ const s = StyleSheet.create({
   delBtn: { padding: 8 },
   fab: { position: 'absolute', right: 20, bottom: 20, backgroundColor: '#22c55e', width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center', elevation: 6 },
   modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  modal: { backgroundColor: '#0f1a2e', padding: 20, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '92%' },
+  modal: { backgroundColor: '#0f1a2e', paddingHorizontal: 20, paddingTop: 20, paddingBottom: Platform.OS === 'android' ? 36 : 24, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '92%' },
   modalHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   modalTitle: { color: '#fff', fontSize: 20, fontWeight: '700' },
   label: { color: '#cbd5e1', fontSize: 13, marginTop: 12, marginBottom: 6 },

@@ -411,6 +411,16 @@ async def matches(user: dict = Depends(get_current_user)):
 
     rep_v = await enrich(others_rep)
     bus_v = await enrich(others_busco)
+    # Map: card_id -> current user's repetido entry id.
+    # `they_want_you_have` items originally carry the OTHER user's busco entry id,
+    # but the frontend sends them as `offered_entry_ids` (which must belong to the
+    # current user, type=repetido). Sustituimos el id por el de mi propia entrada
+    # de "repetido" sobre la misma card, manteniendo card/collection intactos.
+    my_rep_by_card = {e["card_id"]: e["id"] for e in my_rep}
+    for v in bus_v:
+        my_eid = my_rep_by_card.get(v.get("card_id"))
+        if my_eid:
+            v["id"] = my_eid
     res = []
     for uid in user_ids:
         p = pmap.get(uid, {})
