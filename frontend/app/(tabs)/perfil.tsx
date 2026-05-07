@@ -6,6 +6,8 @@ import { useRouter } from 'expo-router';
 import { http } from '../../src/api';
 import { useAuth } from '../../src/auth';
 
+type Collection = { id: string; name: string; season: string };
+
 function notify(title: string, msg: string) {
   if (Platform.OS === 'web') {
     if (typeof window !== 'undefined') window.alert(`${title}\n\n${msg}`);
@@ -24,6 +26,8 @@ export default function Perfil() {
   const [city, setCity] = useState('');
   const [bio, setBio] = useState('');
   const [ownPlayer, setOwnPlayer] = useState('');
+  const [defaultColId, setDefaultColId] = useState('');
+  const [collections, setCollections] = useState<Collection[]>([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -35,8 +39,18 @@ export default function Perfil() {
       setCity((profile as any).city_zone || '');
       setBio((profile as any).bio || '');
       setOwnPlayer((profile as any).own_player_name || '');
+      setDefaultColId((profile as any).default_collection_id || '');
     }
   }, [profile]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await http.get<Collection[]>('/collections');
+        setCollections(r.data || []);
+      } catch { /* sin colecciones disponibles, no bloqueamos */ }
+    })();
+  }, []);
 
   const save = async () => {
     setSaving(true);
@@ -44,6 +58,7 @@ export default function Perfil() {
       await http.put('/profile/me', {
         display_name: displayName, club, category, phone, city_zone: city, bio,
         own_player_name: ownPlayer,
+        default_collection_id: defaultColId,
       });
       await refresh();
       notify('Guardado', 'Perfil actualizado');
@@ -94,6 +109,32 @@ export default function Perfil() {
       />
       <Text style={s.hint}>Así otros pueden saber qué cromo especial tuyo buscar.</Text>
 
+      <Text style={s.label}>Colección principal (opcional)</Text>
+      <Text style={s.hint}>Se preseleccionará al añadir cromos en "Mis Cambios". Puedes cambiarla en cada operación.</Text>
+      {collections.length === 0 ? (
+        <Text style={[s.hint, { marginTop: 8 }]}>Sin colecciones disponibles aún.</Text>
+      ) : (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
+          <TouchableOpacity
+            testID="prof-default-col-none"
+            style={[s.chip, !defaultColId && s.chipActive]}
+            onPress={() => setDefaultColId('')}
+          >
+            <Text style={[s.chipTxt, !defaultColId && s.chipTxtActive]}>— Ninguna —</Text>
+          </TouchableOpacity>
+          {collections.map((c) => (
+            <TouchableOpacity
+              key={c.id}
+              testID={`prof-default-col-${c.id}`}
+              style={[s.chip, defaultColId === c.id && s.chipActive]}
+              onPress={() => setDefaultColId(c.id)}
+            >
+              <Text style={[s.chipTxt, defaultColId === c.id && s.chipTxtActive]}>{c.name} · {c.season}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
+
       <Text style={s.label}>Bio</Text>
       <TextInput style={[s.input, { minHeight: 80 }]} value={bio} onChangeText={setBio} multiline placeholder="Sobre ti..." placeholderTextColor="#64748b" />
 
@@ -119,6 +160,10 @@ const s = StyleSheet.create({
   label: { color: '#cbd5e1', fontSize: 13, marginBottom: 6, marginTop: 14 },
   hint: { color: '#64748b', fontSize: 11, marginTop: 4, fontStyle: 'italic' },
   input: { backgroundColor: '#111c2e', borderColor: '#1f2a44', borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: '#fff', fontSize: 15 },
+  chip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: '#111c2e', borderWidth: 1, borderColor: '#1f2a44', marginRight: 6 },
+  chipActive: { backgroundColor: '#22c55e', borderColor: '#22c55e' },
+  chipTxt: { color: '#cbd5e1', fontSize: 13 },
+  chipTxtActive: { color: '#0b1220', fontWeight: '700' },
   btn: { backgroundColor: '#22c55e', borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 24 },
   btnTxt: { color: '#0b1220', fontWeight: '700' },
   btnDanger: { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#f87171', marginTop: 12 },

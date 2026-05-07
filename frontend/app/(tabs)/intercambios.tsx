@@ -125,6 +125,13 @@ export default function Intercambios() {
                 );
               })()}
 
+              {e.message && e.message.trim() ? (
+                <View style={s.msg}>
+                  <Text style={s.msgLbl}>💬 Mensaje</Text>
+                  <Text style={s.msgTxt}>{e.message}</Text>
+                </View>
+              ) : null}
+
               {e.contact ? (
                 <View style={s.contact}>
                   <Text style={s.contactTitle}>📞 Contacto desbloqueado</Text>
@@ -165,6 +172,9 @@ const s = StyleSheet.create({
   contact: { backgroundColor: '#0f2a1f', borderColor: '#22c55e', borderWidth: 1, borderRadius: 10, padding: 10, marginTop: 10 },
   contactTitle: { color: '#22c55e', fontWeight: '700', marginBottom: 4 },
   contactLine: { color: '#cbd5e1', fontSize: 13 },
+  msg: { backgroundColor: '#0f1a2e', borderColor: '#1f2a44', borderWidth: 1, borderRadius: 10, padding: 10, marginTop: 10 },
+  msgLbl: { color: '#94a3b8', fontWeight: '700', fontSize: 12, marginBottom: 4 },
+  msgTxt: { color: '#cbd5e1', fontSize: 13, lineHeight: 18 },
   actions: { flexDirection: 'row', gap: 8, marginTop: 12 },
   btn: { flex: 1, paddingVertical: 10, borderRadius: 8, alignItems: 'center' },
   btnAccept: { backgroundColor: '#22c55e' },

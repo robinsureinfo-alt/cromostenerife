@@ -7,6 +7,7 @@ import os
 import re
 import uuid
 import logging
+import unicodedata
 import bcrypt
 import jwt
 from datetime import datetime, timezone, timedelta
@@ -82,6 +83,7 @@ class ProfileIn(BaseModel):
     city_zone: str = ""
     bio: str = ""
     own_player_name: str = ""  # El nombre del jugador propio del niño (para cromos especiales)
+    default_collection_id: str = ""  # Colección preseleccionada al añadir cromos
 
 class CollectionIn(BaseModel):
     name: str
@@ -117,6 +119,16 @@ def now_iso() -> str:
 
 def new_id() -> str:
     return str(uuid.uuid4())
+
+
+def _norm_name(s: str) -> str:
+    """Normaliza nombre de jugador para comparación: lowercase, sin tildes, espacios colapsados."""
+    if not s:
+        return ""
+    s = unicodedata.normalize("NFKD", str(s))
+    s = "".join(c for c in s if not unicodedata.combining(c))
+    s = re.sub(r"\s+", " ", s).strip().lower()
+    return s
 
 
 @api.post("/auth/register")
@@ -397,7 +409,35 @@ async def matches(user: dict = Depends(get_current_user)):
     rep_ids = [e["card_id"] for e in my_rep]
     others_rep = await db.user_card_entries.find({"user_id": {"$ne": user["id"]}, "entry_type": "repetido", "status": "active", "card_id": {"$in": busco_ids}}, {"_id": 0}).to_list(1000) if busco_ids else []
     others_busco = await db.user_card_entries.find({"user_id": {"$ne": user["id"]}, "entry_type": "busco", "status": "active", "card_id": {"$in": rep_ids}}, {"_id": 0}).to_list(1000) if rep_ids else []
-    user_ids = list({*[e["user_id"] for e in others_rep], *[e["user_id"] for e in others_busco]})
+
+    # --- Mejora: own_player_name match ---
+    # Si el usuario tiene own_player_name rellenado, buscamos también repetidos
+    # de otros usuarios sobre cromos especiales cuyo player_name coincida (case/tildes-insensible).
+    my_profile = await db.profiles.find_one({"user_id": user["id"]}, {"_id": 0}) or {}
+    own_player_norm = _norm_name(my_profile.get("own_player_name", ""))
+    own_player_entries: List[dict] = []
+    if own_player_norm:
+        all_specials = await db.cards.find(
+            {"card_type": {"$in": ["special", "ballondor"]}},
+            {"_id": 0},
+        ).to_list(2000)
+        matching_card_ids = [c["id"] for c in all_specials if _norm_name(c.get("player_name", "")) == own_player_norm]
+        if matching_card_ids:
+            own_player_entries = await db.user_card_entries.find(
+                {
+                    "user_id": {"$ne": user["id"]},
+                    "entry_type": "repetido",
+                    "status": "active",
+                    "card_id": {"$in": matching_card_ids},
+                },
+                {"_id": 0},
+            ).to_list(500)
+
+    user_ids = list({
+        *[e["user_id"] for e in others_rep],
+        *[e["user_id"] for e in others_busco],
+        *[e["user_id"] for e in own_player_entries],
+    })
     if not user_ids:
         return []
     profs = await db.profiles.find({"user_id": {"$in": user_ids}}, {"_id": 0}).to_list(1000)
@@ -411,6 +451,7 @@ async def matches(user: dict = Depends(get_current_user)):
 
     rep_v = await enrich(others_rep)
     bus_v = await enrich(others_busco)
+    own_v = await enrich(own_player_entries)
     # Map: card_id -> current user's repetido entry id.
     # `they_want_you_have` items originally carry the OTHER user's busco entry id,
     # but the frontend sends them as `offered_entry_ids` (which must belong to the
@@ -426,15 +467,25 @@ async def matches(user: dict = Depends(get_current_user)):
         p = pmap.get(uid, {})
         their_rep = [e for e in rep_v if e["user_id"] == uid]
         their_bus = [e for e in bus_v if e["user_id"] == uid]
+        their_own = [e for e in own_v if e["user_id"] == uid]
         is_cross = bool(their_rep and their_bus)
+        # Priority: cross_match > regular busco/rep > own_player_only
+        if is_cross:
+            prio = 3000 + len(their_rep) * 10
+        elif their_rep or their_bus:
+            prio = 1000 + len(their_rep) * 10 + len(their_bus) * 5
+        else:
+            prio = 100 + len(their_own)
         res.append({
             "user_id": uid,
             "display_name": p.get("display_name", ""),
             "club": p.get("club", ""),
             "they_have_you_want": their_rep,
             "they_want_you_have": their_bus,
+            "they_have_your_player": their_own,
             "cross_match": is_cross,
-            "priority": (1000 if is_cross else 0) + len(their_rep) * 10,
+            "own_player_match": bool(their_own),
+            "priority": prio,
         })
     res.sort(key=lambda x: x["priority"], reverse=True)
     return res

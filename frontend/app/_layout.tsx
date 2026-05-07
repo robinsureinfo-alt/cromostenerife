@@ -5,7 +5,7 @@ import { AuthProvider, useAuth } from '../src/auth';
 import { StatusBar } from 'expo-status-bar';
 
 function Gate({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, profile, loading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
@@ -14,8 +14,15 @@ function Gate({ children }: { children: React.ReactNode }) {
     const inAuth = segments[0] === 'login' || segments[0] === 'register';
     const inTabs = segments[0] === '(tabs)';
     if (!user && inTabs) router.replace('/login');
-    else if (user && (inAuth || segments.length === 0)) router.replace('/(tabs)/dashboard');
-  }, [user, loading, segments, router]);
+    else if (user && (inAuth || segments.length === 0)) {
+      // Si el perfil no está completado (usuario recién registrado), llevar a Perfil
+      if (profile && (profile as any).profile_completed === false) {
+        router.replace('/(tabs)/perfil');
+      } else {
+        router.replace('/(tabs)/dashboard');
+      }
+    }
+  }, [user, profile, loading, segments, router]);
 
   if (loading) {
     return (

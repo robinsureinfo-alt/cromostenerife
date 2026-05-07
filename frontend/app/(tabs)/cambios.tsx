@@ -6,6 +6,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { http } from '../../src/api';
+import { useAuth } from '../../src/auth';
 
 type Entry = {
   id: string; entry_type: 'busco' | 'repetido'; quantity: number;
@@ -25,6 +26,7 @@ function notify(title: string, msg: string) {
 type Special = { player_name: string; card_type: 'ballondor' | 'special' };
 
 export default function Cambios() {
+  const { profile } = useAuth();
   const [tab, setTab] = useState<'busco' | 'repetido'>('busco');
   const [entries, setEntries] = useState<Entry[]>([]);
   const [collections, setCollections] = useState<Collection[]>([]);
@@ -70,15 +72,19 @@ export default function Cambios() {
       setEntries(eR.data);
       setCollections(cR.data);
       if (!colId && cR.data.length > 0) {
-        setColId(cR.data[0].id);
-        if (cR.data[0].total_cards) setRangeMax(cR.data[0].total_cards);
+        // Preselecciona la colección principal del perfil si existe en la lista
+        const def = (profile as any)?.default_collection_id || '';
+        const preferred = def && cR.data.find((c) => c.id === def) ? def : cR.data[0].id;
+        setColId(preferred);
+        const chosen = cR.data.find((c) => c.id === preferred);
+        if (chosen?.total_cards) setRangeMax(chosen.total_cards);
       }
     } catch { /* ignore */ }
     finally {
       setLoading(false);
       setRefresh(false);
     }
-  }, [tab, colId]);
+  }, [tab, colId, profile]);
 
   useEffect(() => { load(); }, [load]);
 

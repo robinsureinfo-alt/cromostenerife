@@ -21,7 +21,8 @@ export default function Register() {
     setLoading(true);
     try {
       await register(email.trim().toLowerCase(), username.trim(), password);
-      router.replace('/(tabs)/dashboard');
+      // Tras registro, llevar al usuario directamente al Perfil para completar sus datos
+      router.replace('/(tabs)/perfil');
     } catch (e: any) {
       setErr(e?.response?.data?.detail || 'Error al registrarte');
     } finally {
